@@ -8,7 +8,7 @@ A usable desktop client that can import an Xray config and connect with one clic
 
 | ID | Milestone | Status |
 |------|-------------------------|-------------|
-| M01 | Foundation | Not Started |
+| M01 | Foundation | Completed |
 | M02 | Xray Integration | Not Started |
 | M03 | Connect UI | Not Started |
 | M04 | Import & Profiles | Not Started |
