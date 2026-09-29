@@ -20,3 +20,9 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) Ping() string {
 	return "pong"
 }
+
+// GetConnectionStatus returns a placeholder connection status for the Xray tunnel.
+func (a *App) GetConnectionStatus() string {
+	// TODO: integrate real Xray status here.
+	return "disconnected"
+}
