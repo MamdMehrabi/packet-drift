@@ -64,3 +64,32 @@ Add unit tests for the service logic where process execution can be mocked.
 - Only one instance may run at a time.
 - Current state is queryable.
 - Closing the app terminates the Xray process cleanly.
+
+## Implementation
+
+Completed in `internal/xray`:
+
+- `state.go` — `State` enum (`StateStopped`, `StateRunning`) with `String()` for UI display.
+- `errors.go` — typed errors: `ErrAlreadyRunning`, `ErrNotRunning`, `ErrInvalidExecutable`, `ErrStartFailed`, `ErrInvalidConfig`.
+- `process.go` — `Process` manages a single OS process:
+  - `Start(binaryPath, configPath)` validates binary + config, launches `xray run -c <config>`, and reaps the child via a wait goroutine (state stays accurate if the process exits on its own).
+  - `Stop()` kills the process and blocks until it has fully exited.
+  - `IsRunning()` exposes process liveness.
+  - `DefaultBinaryPath()` resolves the embedded binary next to the executable for single-file builds.
+- `service.go` — `Service` wraps `Process` with `atomic` state tracking, `Start`/`Stop`/`State`/`Shutdown`. `Shutdown` is error-free and safe to call on app exit.
+
+Wired into the app:
+
+- `App` in `app.go` holds an `*xray.Service`; `OnShutdown` (`shutdown(ctx)`) calls `xray.Shutdown()` so closing the desktop app terminates Xray cleanly.
+- `App.GetConnectionStatus()` now returns the real engine state instead of a placeholder.
+
+Tests (`internal/xray/service_test.go`) use a shell script as a mock Xray binary:
+
+- start/stop lifecycle, double-start rejection (`ErrAlreadyRunning`), stop-when-stopped (`ErrNotRunning`), missing binary (`ErrInvalidExecutable`), missing config (`ErrInvalidConfig`), idempotent `Shutdown`, single-instance guarantee, and self-terminating processes.
+
+Verified: `go test ./...` and `go test -race ./...` pass; `go vet` clean; release binary builds.
+
+## Notes
+
+- The Xray binary is not shipped in the repo yet; it is resolved via `DefaultBinaryPath()` (next to the executable) and should be embedded during M05 packaging.
+- Frontend/UI changes belong to M03 (Connect UI).

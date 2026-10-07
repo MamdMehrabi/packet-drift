@@ -5,37 +5,353 @@
 }
 
 body {
-  font-family: system-ui, sans-serif;
-  background: #121212;
-  color: #e0e0e0;
+  font-family: "IBM Plex Sans", "Noto Sans", sans-serif;
+  background: #171a18;
+  color: #f1f3ef;
   min-height: 100vh;
 }
 
 main {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
   min-height: 100vh;
-  padding: 2rem;
+  padding: 48px 24px;
+  background: radial-gradient(ellipse at 50% -20%, #344139 0%, #202723 40%, #171a18 78%);
+}
+
+.dashboard {
+  width: min(100%, 700px);
+  margin: 0 auto;
+}
+
+.topbar,
+.file-row,
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.topbar {
+  padding-bottom: 28px;
+  border-bottom: 1px solid #39413b;
 }
 
 h1 {
-  font-size: 2rem;
+  font-size: 1.15rem;
   font-weight: 600;
 }
 
-button {
-  padding: 0.5rem 1.5rem;
-  border: 1px solid #444;
-  border-radius: 6px;
-  background: #1e1e1e;
-  color: #e0e0e0;
-  cursor: pointer;
-  font-size: 1rem;
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #bdc5be;
+  font-size: 0.85rem;
+  text-transform: capitalize;
 }
 
-button:hover {
-  background: #2a2a2a;
+.status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #858e87;
+}
+
+.status--running .status__dot {
+  background: #8bd6a1;
+  box-shadow: 0 0 12px #8bd68070;
+}
+
+.connection {
+  padding: 48px 0 36px;
+}
+
+.eyebrow {
+  margin-bottom: 12px;
+  color: #a8b8a9;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+h2 {
+  font-size: clamp(2rem, 7vw, 3rem);
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.connection__detail {
+  margin-top: 12px;
+  color: #adb5ae;
+  font-size: 0.95rem;
+}
+
+.settings {
+  border-top: 1px solid #39413b;
+}
+
+.file-row {
+  gap: 16px;
+  min-height: 84px;
+  border-bottom: 1px solid #39413b;
+}
+
+.file-row__copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.file-row__label {
+  color: #dce2dc;
+  font-size: 0.9rem;
+}
+
+.file-row__path {
+  overflow: hidden;
+  color: #909a92;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.button--secondary {
+  border-color: #4b554d;
+  background: #242a26;
+  color: #e3e8e2;
+}
+
+.button--secondary:hover:not(:disabled) {
+  background: #303832;
+}
+
+.actions {
+  justify-content: flex-end;
+  padding-top: 24px;
+}
+
+.button--connect {
+  min-width: 132px;
+  background: #8bd6a1;
+  color: #142219;
+  font-weight: 650;
+}
+
+.button--connect:hover:not(:disabled) {
+  background: #a1e3b4;
+}
+
+.button--disconnect {
+  min-width: 132px;
+  border-color: #865b52;
+  background: #382723;
+  color: #f0c3b8;
+}
+
+.button--disconnect:hover:not(:disabled) {
+  background: #4b302a;
+}
+
+.traffic {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 38px;
+}
+
+.traffic-panel {
+  min-width: 0;
+  padding: 18px 18px 15px;
+  border: 1px solid #39413b;
+  border-radius: 5px;
+  background: #1d231f;
+}
+
+.traffic-panel__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.traffic-panel__label {
+  color: #b5beb6;
+  font-size: 0.82rem;
+}
+
+.traffic-panel__heading strong {
+  color: #eff5ef;
+  font-size: 1.25rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.traffic-chart {
+  display: flex;
+  align-items: end;
+  gap: 3px;
+  height: 54px;
+  margin: 16px 0 12px;
+  overflow: hidden;
+}
+
+.traffic-chart span {
+  flex: 1 1 0;
+  min-width: 2px;
+  border-radius: 2px 2px 0 0;
+  background: #75c6e6;
+  opacity: 0.82;
+  animation: chart-enter 240ms ease-out both;
+}
+
+.traffic-chart--upload span {
+  background: #e3a874;
+}
+
+@keyframes chart-enter {
+  from { transform: scaleY(0.2); transform-origin: bottom; }
+  to { transform: scaleY(1); transform-origin: bottom; }
+}
+
+.traffic-panel__total {
+  color: #8f9991;
+  font-size: 0.75rem;
+}
+
+.stats-note {
+  margin: -22px 0 28px;
+  color: #b4bdaf;
+  font-size: 0.8rem;
+}
+
+.config-section {
+  border-top: 1px solid #39413b;
+  padding-top: 24px;
+}
+
+.config-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+h3 {
+  font-size: 1.05rem;
+  font-weight: 550;
+}
+
+.config-input {
+  display: block;
+  width: 100%;
+  min-height: 190px;
+  resize: vertical;
+  padding: 15px 16px;
+  border: 1px solid #414b43;
+  border-radius: 5px;
+  outline: none;
+  background: #141815;
+  color: #dce6dc;
+  font: 0.82rem/1.55 "IBM Plex Mono", "Noto Sans Mono", monospace;
+  tab-size: 2;
+}
+
+.config-input:focus {
+  border-color: #79b9a0;
+  box-shadow: 0 0 0 2px #79b9a01f;
+}
+
+.config-input::placeholder {
+  color: #657068;
+}
+
+.config-input:disabled {
+  opacity: 0.65;
+}
+
+.config-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 9px;
+  color: #8f9991;
+  font-size: 0.73rem;
+}
+
+.stats-note + .config-section {
+  margin-top: 0;
+}
+
+.error {
+  margin-top: 18px;
+  color: #ff9c8c;
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  main {
+    padding: 28px 18px;
+  }
+
+  .connection {
+    padding: 38px 0 30px;
+  }
+
+  .traffic {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 30px;
+  }
+
+  .traffic-panel {
+    padding: 14px;
+  }
+
+  .traffic-chart {
+    height: 42px;
+    margin: 11px 0 8px;
+  }
+
+  .config-heading {
+    align-items: center;
+  }
+
+  .config-heading .button {
+    max-width: 48%;
+    padding: 0 10px;
+    font-size: 0.78rem;
+    white-space: normal;
+  }
+
+  .config-input {
+    min-height: 170px;
+  }
+
+  .file-row {
+    align-items: flex-start;
+    padding: 18px 0;
+  }
+
+  .button--secondary {
+    min-height: 36px;
+    padding: 0 12px;
+  }
 }
