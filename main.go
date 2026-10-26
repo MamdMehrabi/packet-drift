@@ -15,9 +15,10 @@ func main() {
 	app := NewApp()
 
 	err := wails.Run(&options.App{
-		Title:  "Packet Drift",
-		Width:  900,
-		Height: 620,
+		Title:         "Packet Drift",
+		Width:         760,
+		Height:        600,
+		DisableResize: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

@@ -139,13 +139,13 @@ func TestProcessSingleInstance(t *testing.T) {
 	bin := writeFakeBinary(t)
 	cfg := writeConfig(t)
 
-	if err := p.Start(bin, cfg); err != nil {
+	if err := p.Start(bin, cfg, nil); err != nil {
 		t.Fatalf("Start(): %v", err)
 	}
 	if !p.IsRunning() {
 		t.Fatal("IsRunning() = false after Start, want true")
 	}
-	if err := p.Start(bin, cfg); !errors.Is(err, ErrAlreadyRunning) {
+	if err := p.Start(bin, cfg, nil); !errors.Is(err, ErrAlreadyRunning) {
 		t.Fatalf("second Start() = %v, want ErrAlreadyRunning", err)
 	}
 	if err := p.Stop(); err != nil {
@@ -166,12 +166,42 @@ func TestProcessExitsOnItsOwn(t *testing.T) {
 	cfg := writeConfig(t)
 
 	p := NewProcess()
-	if err := p.Start(bin, cfg); err != nil {
+	if err := p.Start(bin, cfg, nil); err != nil {
 		t.Fatalf("Start(): %v", err)
 	}
 	time.Sleep(200 * time.Millisecond)
 	if p.IsRunning() {
 		t.Fatal("IsRunning() = true after process exited on its own, want false")
+	}
+}
+
+func TestProcessStreamsStdoutAndStderr(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "logging-xray")
+	script := "#!/bin/sh\necho 'stdout line'\necho 'stderr line' >&2\nsleep 10\n"
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake binary: %v", err)
+	}
+	cfg := writeConfig(t)
+	logs := make(chan string, 2)
+	process := NewProcess()
+	if err := process.Start(bin, cfg, func(line string) { logs <- line }); err != nil {
+		t.Fatalf("Start(): %v", err)
+	}
+	defer process.Stop()
+
+	seen := map[string]bool{}
+	deadline := time.After(2 * time.Second)
+	for len(seen) < 2 {
+		select {
+		case line := <-logs:
+			seen[line] = true
+		case <-deadline:
+			t.Fatalf("received log lines = %#v, want stdout and stderr", seen)
+		}
+	}
+	if !seen["stdout line"] || !seen["stderr line"] {
+		t.Fatalf("received log lines = %#v", seen)
 	}
 }
 
@@ -287,12 +317,12 @@ func TestBundledXrayStatsAPI(t *testing.T) {
 	for time.Now().Before(deadline) {
 		stats, err := service.Traffic()
 		lastStats = stats
-		if err == nil && stats.DownloadBytes >= uint64(len(body)) {
+		if err == nil && stats.UploadBytes > 0 && stats.DownloadBytes >= uint64(len(body)) {
 			return
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	t.Fatalf("Xray outbound download counter did not include the proxied response: %#v", lastStats)
+	t.Fatalf("Xray outbound counters did not include both request and response traffic: %#v", lastStats)
 }
 
 func TestBundledXrayRejectsInvalidProfile(t *testing.T) {

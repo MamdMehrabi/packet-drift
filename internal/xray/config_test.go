@@ -49,3 +49,11 @@ func TestParseTrafficCounters(t *testing.T) {
 		t.Fatalf("parseTrafficCounters() = (%d, %d), want (1500, 4500)", upload, download)
 	}
 }
+
+func TestParseTrafficCountersForConfiguredOutbounds(t *testing.T) {
+	output := `{"stat":[{"name":"outbound>>>proxy>>>traffic>>>uplink","value":1200},{"name":"outbound>>>proxy>>>traffic>>>downlink","value":4500},{"name":"outbound>>>proxy-backup>>>traffic>>>uplink","value":300},{"name":"inbound>>>local-socks>>>traffic>>>uplink","value":999}]}`
+	upload, download := parseTrafficCountersForTags(output, []string{"proxy"})
+	if upload != 1200 || download != 4500 {
+		t.Fatalf("parseTrafficCountersForTags() = (%d, %d), want (1200, 4500)", upload, download)
+	}
+}

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/amiri/packet-drift/internal/xray"
+	"github.com/MamdMehrabi/packet-drift/internal/xray"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -18,6 +18,9 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.xray.SetLogHandler(func(line string) {
+		runtime.EventsEmit(ctx, "xray:log", line)
+	})
 }
 
 func (a *App) shutdown(ctx context.Context) {
@@ -81,8 +84,8 @@ func (a *App) StopXray() error {
 	return a.xray.Stop()
 }
 
-// StartXrayWithConfig starts Xray using pasted JSON configuration.
-func (a *App) StartXrayWithConfig(binaryPath, configJSON string) error {
+// StartXrayWithURI converts a proxy URI to an Xray config and starts the engine.
+func (a *App) StartXrayWithURI(binaryPath, proxyURI, mode, proxyAddress string) error {
 	if binaryPath == "" {
 		var err error
 		binaryPath, err = xray.DefaultBinaryPath()
@@ -90,7 +93,7 @@ func (a *App) StartXrayWithConfig(binaryPath, configJSON string) error {
 			return err
 		}
 	}
-	return a.xray.StartWithConfig(binaryPath, configJSON)
+	return a.xray.StartWithURI(binaryPath, proxyURI, mode, proxyAddress)
 }
 
 // GetTrafficStats returns cumulative Xray outbound traffic and current rates.

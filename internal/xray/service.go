@@ -20,14 +20,16 @@ import (
 // It is the single point through which the app starts, stops, and
 // queries the Xray engine.
 type Service struct {
-	proc       *Process
-	state      atomic.Int32 // StateStopped / StateRunning
-	mu         sync.Mutex
-	trafficMu  sync.Mutex
-	binaryPath string
-	apiAddress string
-	tempDir    string
-	lastSample trafficSample
+	proc         *Process
+	state        atomic.Int32 // StateStopped / StateRunning
+	mu           sync.Mutex
+	trafficMu    sync.Mutex
+	binaryPath   string
+	apiAddress   string
+	tempDir      string
+	outboundTags []string
+	lastSample   trafficSample
+	logHandler   func(string)
 }
 
 type TrafficStats struct {
@@ -49,15 +51,26 @@ func NewService() *Service {
 	return s
 }
 
+func (s *Service) SetLogHandler(handler func(string)) {
+	s.mu.Lock()
+	s.logHandler = handler
+	s.mu.Unlock()
+}
+
 // Start begins the Xray process using the binary at binaryPath with the
 // given config file. It returns a typed error on failure.
 func (s *Service) Start(binaryPath, configPath string) error {
-	return s.start(binaryPath, configPath, "", "")
+	return s.start(binaryPath, configPath, "", "", nil)
 }
 
 // StartWithConfig instruments a pasted Xray JSON config for traffic stats and
 // stores the private working copy outside the project directory.
 func (s *Service) StartWithConfig(binaryPath, rawConfig string) error {
+	outboundTags := configuredOutboundTags(rawConfig)
+	return s.startWithConfig(binaryPath, rawConfig, outboundTags)
+}
+
+func (s *Service) startWithConfig(binaryPath, rawConfig string, outboundTags []string) error {
 	if binaryPath == "" {
 		var err error
 		binaryPath, err = DefaultBinaryPath()
@@ -96,25 +109,35 @@ func (s *Service) StartWithConfig(binaryPath, rawConfig string) error {
 		_ = os.RemoveAll(tempDir)
 		return fmt.Errorf("xray: validate config: %w: %s", err, strings.TrimSpace(string(output)))
 	}
-	if err := s.start(binaryPath, configPath, apiAddress, tempDir); err != nil {
+	if err := s.start(binaryPath, configPath, apiAddress, tempDir, outboundTags); err != nil {
 		_ = os.RemoveAll(tempDir)
 		return err
 	}
 	return nil
 }
 
-func (s *Service) start(binaryPath, configPath, apiAddress, tempDir string) error {
+// StartWithURI converts a supported proxy share URI to an Xray config.
+func (s *Service) StartWithURI(binaryPath, proxyURI, mode, proxyAddress string) error {
+	config, err := configFromURIWithOptions(proxyURI, mode, proxyAddress)
+	if err != nil {
+		return err
+	}
+	return s.startWithConfig(binaryPath, config, configuredOutboundTags(config))
+}
+
+func (s *Service) start(binaryPath, configPath, apiAddress, tempDir string, outboundTags []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.proc.IsRunning() {
 		return ErrAlreadyRunning
 	}
-	if err := s.proc.Start(binaryPath, configPath); err != nil {
+	if err := s.proc.Start(binaryPath, configPath, s.logHandler); err != nil {
 		return err
 	}
 	s.binaryPath = binaryPath
 	s.apiAddress = apiAddress
 	s.tempDir = tempDir
+	s.outboundTags = append([]string(nil), outboundTags...)
 	s.lastSample = trafficSample{}
 	s.state.Store(int32(StateRunning))
 	return nil
@@ -166,6 +189,7 @@ func (s *Service) Traffic() (TrafficStats, error) {
 		return TrafficStats{}, nil
 	}
 	binaryPath, apiAddress := s.binaryPath, s.apiAddress
+	outboundTags := append([]string(nil), s.outboundTags...)
 	s.mu.Unlock()
 	if apiAddress == "" {
 		return TrafficStats{}, ErrStatsUnavailable
@@ -177,7 +201,7 @@ func (s *Service) Traffic() (TrafficStats, error) {
 	if err != nil {
 		return TrafficStats{}, fmt.Errorf("xray: query traffic stats: %w: %s", err, strings.TrimSpace(string(output)))
 	}
-	upload, download := parseTrafficCounters(string(output))
+	upload, download := parseTrafficCountersForTags(string(output), outboundTags)
 	now := time.Now()
 
 	s.mu.Lock()
@@ -204,10 +228,15 @@ func (s *Service) clearRuntimeLocked() {
 	s.binaryPath = ""
 	s.apiAddress = ""
 	s.tempDir = ""
+	s.outboundTags = nil
 	s.lastSample = trafficSample{}
 }
 
 func parseTrafficCounters(output string) (upload, download uint64) {
+	return parseTrafficCountersForTags(output, nil)
+}
+
+func parseTrafficCountersForTags(output string, tags []string) (upload, download uint64) {
 	var response struct {
 		Stats []struct {
 			Name  string `json:"name"`
@@ -216,7 +245,7 @@ func parseTrafficCounters(output string) (upload, download uint64) {
 	}
 	if err := json.Unmarshal([]byte(output), &response); err == nil {
 		for _, stat := range response.Stats {
-			if !strings.HasPrefix(stat.Name, "outbound>>>") {
+			if !isTrackedOutboundStat(stat.Name, tags) {
 				continue
 			}
 			switch {
@@ -229,6 +258,40 @@ func parseTrafficCounters(output string) (upload, download uint64) {
 		return upload, download
 	}
 	return upload, download
+}
+
+func isTrackedOutboundStat(name string, tags []string) bool {
+	if !strings.HasPrefix(name, "outbound>>>") {
+		return false
+	}
+	if len(tags) == 0 {
+		return true
+	}
+	for _, tag := range tags {
+		prefix := "outbound>>>" + tag + ">>>traffic>>>"
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func configuredOutboundTags(rawConfig string) []string {
+	var config struct {
+		Outbounds []struct {
+			Tag string `json:"tag"`
+		} `json:"outbounds"`
+	}
+	if err := json.Unmarshal([]byte(rawConfig), &config); err != nil {
+		return nil
+	}
+	tags := make([]string, 0, len(config.Outbounds))
+	for _, outbound := range config.Outbounds {
+		if outbound.Tag != "" {
+			tags = append(tags, outbound.Tag)
+		}
+	}
+	return tags
 }
 
 func instrumentConfig(rawConfig, apiAddress string) ([]byte, error) {
