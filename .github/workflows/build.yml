@@ -32,20 +32,25 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
+
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Download Xray
+        run: bash scripts/download-xray.sh
+
+      - name: Generate Wails bindings
+        run: wails generate module
 
       - name: Build frontend
         working-directory: frontend
         run: npm run build
 
-      - name: Download Xray
-        run: bash scripts/download-xray.sh
-
       - name: Run tests
         run: go test ./...
-
 
   build:
     name: Build (${{ matrix.os }})
@@ -89,8 +94,15 @@ jobs:
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
 
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
       - name: Download Xray
         run: bash scripts/download-xray.sh
+
+      - name: Generate Wails bindings
+        run: wails generate module
 
       - name: Build application
         shell: bash
@@ -108,3 +120,4 @@ jobs:
           path: build/bin/
           if-no-files-found: error
           retention-days: 7
+          
