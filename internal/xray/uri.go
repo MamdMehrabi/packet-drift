@@ -33,6 +33,18 @@ func configFromURIWithOptions(rawURI, mode, proxyAddress string) (string, error)
 			"settings": map[string]any{"auth": "noauth", "udp": true},
 			"tag":      "local-socks",
 		}
+	case "lan":
+		host, port, err := privateLANAddress(proxyAddress)
+		if err != nil {
+			return "", err
+		}
+		inbound = map[string]any{
+			"listen":   host,
+			"port":     port,
+			"protocol": "socks",
+			"settings": map[string]any{"auth": "noauth", "udp": true},
+			"tag":      "lan-socks",
+		}
 	case "tunnel":
 		inbound = map[string]any{
 			"protocol": "tun",
@@ -46,7 +58,7 @@ func configFromURIWithOptions(rawURI, mode, proxyAddress string) (string, error)
 			"tag": "local-tun",
 		}
 	default:
-		return "", invalidURI("connection mode must be proxy or tunnel")
+		return "", invalidURI("connection mode must be proxy, lan, or tunnel")
 	}
 
 	var outbound map[string]any
@@ -90,6 +102,22 @@ func configFromURIWithOptions(rawURI, mode, proxyAddress string) (string, error)
 		return "", fmt.Errorf("%w: encode generated config", ErrInvalidConfig)
 	}
 	return string(encoded), nil
+}
+
+func privateLANAddress(address string) (string, int, error) {
+	host, portText, err := net.SplitHostPort(strings.TrimSpace(address))
+	if err != nil {
+		return "", 0, invalidURI("LAN address must be a private IPv4 address and port")
+	}
+	ip := net.ParseIP(host)
+	if ip == nil || ip.To4() == nil || !ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+		return "", 0, invalidURI("LAN address must be a private IPv4 address")
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil || port < 1 || port > 65535 {
+		return "", 0, invalidURI("LAN address must use a valid port")
+	}
+	return host, port, nil
 }
 
 func loopbackAddress(address string) (string, int, error) {
@@ -301,6 +329,9 @@ func parseVMessURI(rawURI string) (map[string]any, string, error) {
 func streamSettings(query url.Values, defaultSecurity string) (map[string]any, error) {
 	network := query.Get("type")
 	if network == "" {
+		network = "tcp"
+	}
+	if network == "raw" {
 		network = "tcp"
 	}
 	stream := map[string]any{"network": network}

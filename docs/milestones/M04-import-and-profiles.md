@@ -9,6 +9,8 @@ Implement configuration import and persistent profile management so users can ma
 - Xray JSON configuration import.
 - Persistent profile storage.
 - Profile selection.
+- Import proxy servers from subscription URLs.
+- Group multiple proxy servers in a profile.
 - Active profile management.
 - Configuration validation.
 - Integration with the connection lifecycle.
@@ -17,6 +19,8 @@ Implement configuration import and persistent profile management so users can ma
 
 ### 1. Configuration Import
 
+- Import proxy servers from subscription URLs.
+- Group multiple proxy servers in a profile.
 Allow users to import supported Xray JSON configuration files through a file picker.
 
 The application must:
@@ -72,14 +76,15 @@ Ensure that switching profiles while connected follows a predictable and safe li
 - Invalid configurations produce understandable errors.
 - Profiles persist across application restarts.
 - Users can select, rename, and remove profiles.
+- Users can select a server within a profile.
 - The selected profile is used for new connections.
+- Subscription URLs can be fetched into profiles containing multiple supported proxy servers.
 - Profile changes cannot silently corrupt a running connection.
 - Sensitive configuration values are not unnecessarily logged.
 - Relevant unit and integration tests pass.
 
 ## Out of Scope
 
-- Subscription URL management.
 - Automatic subscription refresh.
 - Cloud synchronization.
 - Advanced configuration editing.

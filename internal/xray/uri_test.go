@@ -103,6 +103,65 @@ func TestConfigFromURIMapsStreamSettings(t *testing.T) {
 	}
 }
 
+func TestConfigFromURIMapsVMessRawNetworkToTCP(t *testing.T) {
+	profile := `{"ps":"raw-node","add":"server.example","port":9090,"id":"11111111-1111-4111-8111-111111111111","aid":0,"scy":"auto","net":"raw"}`
+	uri := "vmess://" + base64.StdEncoding.EncodeToString([]byte(profile))
+	generated, err := configFromURI(uri)
+	if err != nil {
+		t.Fatalf("configFromURI(): %v", err)
+	}
+	var config struct {
+		Outbounds []struct {
+			StreamSettings struct {
+				Network     string `json:"network"`
+				TCPSettings struct {
+					Header struct {
+						Type string `json:"type"`
+					} `json:"header"`
+				} `json:"tcpSettings"`
+			} `json:"streamSettings"`
+		} `json:"outbounds"`
+	}
+	if err := json.Unmarshal([]byte(generated), &config); err != nil {
+		t.Fatalf("decode generated config: %v", err)
+	}
+	if len(config.Outbounds) != 1 {
+		t.Fatalf("outbounds = %#v, want one outbound", config.Outbounds)
+	}
+	stream := config.Outbounds[0].StreamSettings
+	if stream.Network != "tcp" || stream.TCPSettings.Header.Type != "none" {
+		t.Fatalf("stream settings = %#v, want standard TCP transport", stream)
+	}
+}
+
+func TestBundledXrayAcceptsVMessRawURI(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("bundled Xray release is linux/amd64 only")
+	}
+	binaryPath, err := DefaultBinaryPath()
+	if err != nil {
+		t.Fatalf("DefaultBinaryPath(): %v", err)
+	}
+	profile := `{"ps":"raw-node","add":"server.example","port":9090,"id":"11111111-1111-4111-8111-111111111111","aid":0,"scy":"auto","net":"raw"}`
+	uri := "vmess://" + base64.StdEncoding.EncodeToString([]byte(profile))
+	generated, err := configFromURI(uri)
+	if err != nil {
+		t.Fatalf("configFromURI(): %v", err)
+	}
+	config, err := instrumentConfig(generated, "127.0.0.1:12345")
+	if err != nil {
+		t.Fatalf("instrumentConfig(): %v", err)
+	}
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(configPath, config, 0o600); err != nil {
+		t.Fatalf("write generated config: %v", err)
+	}
+	output, err := exec.Command(binaryPath, "run", "-test", "-c", configPath).CombinedOutput()
+	if err != nil {
+		t.Fatalf("bundled Xray rejected VMess raw config: %v: %s", err, strings.TrimSpace(string(output)))
+	}
+}
+
 func TestConfigFromURIWithOptions(t *testing.T) {
 	uri := "vless://user@example.com:443"
 	generated, err := configFromURIWithOptions(uri, "proxy", "127.0.0.1:9050")
@@ -131,9 +190,27 @@ func TestConfigFromURIWithOptions(t *testing.T) {
 		t.Fatalf("tunnel inbound = %#v", tunnelInbound)
 	}
 
+	generated, err = configFromURIWithOptions(uri, "lan", "192.168.1.25:10808")
+	if err != nil {
+		t.Fatalf("configFromURIWithOptions(lan): %v", err)
+	}
+	var lanConfig map[string]any
+	if err := json.Unmarshal([]byte(generated), &lanConfig); err != nil {
+		t.Fatalf("decode LAN config: %v", err)
+	}
+	lanInbound := lanConfig["inbounds"].([]any)[0].(map[string]any)
+	if lanInbound["listen"] != "192.168.1.25" || lanInbound["port"] != float64(10808) || lanInbound["tag"] != "lan-socks" {
+		t.Fatalf("LAN inbound = %#v", lanInbound)
+	}
+
 	for _, address := range []string{"0.0.0.0:10808", "192.168.1.2:10808", "localhost", "127.0.0.1:0"} {
 		if _, err := configFromURIWithOptions(uri, "proxy", address); !errors.Is(err, ErrInvalidConfig) {
 			t.Errorf("proxy address %q error = %v, want ErrInvalidConfig", address, err)
+		}
+	}
+	for _, address := range []string{"127.0.0.1:10808", "8.8.8.8:10808", "169.254.1.4:10808", "192.168.1.2:0"} {
+		if _, err := configFromURIWithOptions(uri, "lan", address); !errors.Is(err, ErrInvalidConfig) {
+			t.Errorf("LAN address %q error = %v, want ErrInvalidConfig", address, err)
 		}
 	}
 }

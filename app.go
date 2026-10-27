@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/MamdMehrabi/packet-drift/internal/xray"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -43,6 +44,11 @@ func (a *App) GetXrayBinaryPath() (string, error) {
 	return xray.DefaultBinaryPath()
 }
 
+// GetLANAddresses returns private IPv4 addresses available for LAN sharing.
+func (a *App) GetLANAddresses() []string {
+	return xray.LANAddresses()
+}
+
 // SelectConfigFile opens a native file picker for an Xray JSON config.
 func (a *App) SelectConfigFile() (string, error) {
 	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
@@ -66,6 +72,16 @@ func (a *App) GetClipboardText() (string, error) {
 	return runtime.ClipboardGetText(a.ctx)
 }
 
+// FetchSubscription downloads and parses a supported proxy subscription.
+func (a *App) FetchSubscription(subscriptionURL string) ([]xray.SubscriptionNode, error) {
+	return xray.FetchSubscription(subscriptionURL)
+}
+
+// PingServer measures the TCP connection latency for a supported proxy URI.
+func (a *App) PingServer(proxyURI string) (int64, error) {
+	return xray.CheckServerLatency(proxyURI)
+}
+
 // StartXray starts the engine with the selected binary and config file.
 // An empty binaryPath uses the conventional location next to the app.
 func (a *App) StartXray(binaryPath, configPath string) error {
@@ -86,6 +102,9 @@ func (a *App) StopXray() error {
 
 // StartXrayWithURI converts a proxy URI to an Xray config and starts the engine.
 func (a *App) StartXrayWithURI(binaryPath, proxyURI, mode, proxyAddress string) error {
+	if mode == "lan" && !xray.IsLANAddress(proxyAddress) {
+		return fmt.Errorf("%w: selected LAN address is no longer available on this device", xray.ErrInvalidConfig)
+	}
 	if binaryPath == "" {
 		var err error
 		binaryPath, err = xray.DefaultBinaryPath()

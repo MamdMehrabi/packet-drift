@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Packet Drift
+Comment=Manage Xray proxy connections
+Exec=packet-drift
+Icon=packet-drift
+Terminal=false
+Categories=Network;
+StartupNotify=true
+StartupWMClass=packet-drift
