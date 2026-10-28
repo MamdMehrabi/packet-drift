@@ -12,7 +12,6 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION_FILE: go.mod
   NODE_VERSION: 22
   WAILS_VERSION: v2.16.0
 
@@ -28,7 +27,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: ${{ env.GO_VERSION_FILE }}
+          go-version-file: go.mod
           cache: true
 
       - name: Set up Node.js
@@ -54,19 +53,20 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
+      - name: Prepare frontend embed directory
+        run: |
+          mkdir -p frontend/dist
+          touch frontend/dist/index.html
+
+      - name: Download Xray
+        run: bash scripts/download-xray.sh
 
       - name: Generate Wails bindings
         run: wails generate module
 
-      - name: Build frontend with generated bindings
+      - name: Build frontend
         working-directory: frontend
         run: npm run build
-
-      - name: Download Xray
-        run: bash scripts/download-xray.sh
 
       - name: Run tests
         run: go test ./...
@@ -90,7 +90,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: ${{ env.GO_VERSION_FILE }}
+          go-version-file: go.mod
           cache: true
 
       - name: Set up Node.js
@@ -117,19 +117,20 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
+      - name: Prepare frontend embed directory
+        run: |
+          mkdir -p frontend/dist
+          touch frontend/dist/index.html
+
+      - name: Download Xray
+        run: bash scripts/download-xray.sh
 
       - name: Generate Wails bindings
         run: wails generate module
 
-      - name: Build frontend with generated bindings
+      - name: Build frontend
         working-directory: frontend
         run: npm run build
-
-      - name: Download Xray
-        run: bash scripts/download-xray.sh
 
       - name: Build application
         shell: bash
